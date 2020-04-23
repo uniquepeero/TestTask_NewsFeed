@@ -24,6 +24,7 @@ def loader() -> Tuple[dict, dict]:
         news_dict = json.load(news_file)
     with open('comments.json') as comments_file:
         comments_dict = json.load(comments_file)
+
     return news_dict, comments_dict
 
 
@@ -55,25 +56,32 @@ def get_list():
     """
     news, comments = loader()
 
+    comments_info = {}
+    for comment in comments['comments']:
+        if comment['newsId'] not in comments_info:
+            comments_info[comment['newsId']] = {
+                'commentsCount': 1,
+                'lastComment': comment['publishedAt']
+            }
+        else:
+            comments_info[comment['newsId']]['commentsCount'] += 1
+            if comment['publishedAt'] > comments_info[comment['newsId']]['lastComment']:
+                comments_info[comment['newsId']]['lastComment'] = comment['publishedAt']
+
     good_news = []
     for news_item in news['news']:
         if datetime.now().isoformat() > news_item['publishedAt'] and not news_item['isDeleted']:
             news_id = news_item['id']
-            comments_counter = 0
-            last_comment = datetime.strptime('2000-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S')
+            try:
+                news_item['commentsCount'] = comments_info[news_id]['commentsCount']
+                news_item['lastComment'] = comments_info[news_id]['lastComment']
+            except KeyError:
+                news_item['commentsCount'] = 0
+                news_item['lastComment'] = None
 
-            for comment in comments['comments']:
-                if comment['newsId'] == news_id:
-                    comments_counter += 1
-                    if datetime.strptime(comment['publishedAt'], '%Y-%m-%dT%H:%M:%S') > last_comment:
-                        news_item['lastComment'] = comment['publishedAt']
-
-            news_item['commentsCount'] = comments_counter
             good_news.append(news_item)
 
-    output = {"news": good_news, 'totalResults': len(good_news)}
-
-    return jsonify(output)
+    return jsonify({"news": good_news, 'totalResults': len(good_news)})
 
 
 @app.route("/news/<int:news_id>")
@@ -113,20 +121,9 @@ def get_item(news_id):
                     datetime.strptime(news_item['publishedAt'], '%Y-%m-%dT%H:%M:%S') > current_time):
                 abort(404)
 
-            last_comment = datetime.strptime('2000-01-01T00:00:00', '%Y-%m-%dT%H:%M:%S')
+            news_item['comments'] = [comment for comment in comments['comments'] if comment['newsId'] == news_id]
+            news_item['comments'].sort(key=lambda comment: comment['publishedAt'], reverse=True)
 
-            good_news = news_item
-            good_news['comments'] = []
-            for comment in comments['comments']:
-                if comment['newsId'] == news_id:
-                    published_time = datetime.strptime(comment['publishedAt'], '%Y-%m-%dT%H:%M:%S')
-                    if published_time > last_comment:
-                        good_news['comments'].insert(0, comment)
-                        last_comment = published_time
-                    else:
-                        good_news['comments'].append(comment)
+            return news_item
 
-            output = good_news
-            return output
     abort(404)
-
