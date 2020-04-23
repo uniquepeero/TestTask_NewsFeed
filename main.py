@@ -69,17 +69,17 @@ def get_list():
                 comments_info[comment['newsId']]['lastComment'] = comment['publishedAt']
 
     good_news = []
-    for news_item in news['news']:
-        if datetime.now().isoformat() > news_item['publishedAt'] and not news_item['isDeleted']:
-            news_id = news_item['id']
-            try:
-                news_item['commentsCount'] = comments_info[news_id]['commentsCount']
-                news_item['lastComment'] = comments_info[news_id]['lastComment']
-            except KeyError:
-                news_item['commentsCount'] = 0
-                news_item['lastComment'] = None
+    news_filter = lambda n: datetime.now().isoformat() > n['publishedAt'] and not n['isDeleted']
+    for news_item in filter(news_filter, news['news']):
+        news_id = news_item['id']
+        try:
+            news_item['commentsCount'] = comments_info[news_id]['commentsCount']
+            news_item['lastComment'] = comments_info[news_id]['lastComment']
+        except KeyError:
+            news_item['commentsCount'] = 0
+            news_item['lastComment'] = None
 
-            good_news.append(news_item)
+        good_news.append(news_item)
 
     return jsonify({"news": good_news, 'totalResults': len(good_news)})
 
